@@ -1,0 +1,7 @@
+
+The following files have been resolved:
+   org.springframework.boot:spring-boot-starter-web:jar:3.3.3:compile[36m -- module spring.boot.starter.web[0;1m [auto][m
+   org.springframework.boot:spring-boot-starter-data-jpa:jar:3.3.3:compile[36m -- module spring.boot.starter.data.jpa[0;1m [auto][m
+   org.springframework.boot:spring-boot-starter-actuator:jar:3.3.3:compile[36m -- module spring.boot.starter.actuator[0;1m [auto][m
+   org.projectlombok:lombok:jar:1.18.46:provided[36m -- module lombok[m
+

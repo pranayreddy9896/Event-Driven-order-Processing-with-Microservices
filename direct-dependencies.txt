@@ -1,0 +1,4 @@
+
+The following files have been resolved:
+   org.projectlombok:lombok:jar:1.18.46:provided[36m -- module lombok[m
+

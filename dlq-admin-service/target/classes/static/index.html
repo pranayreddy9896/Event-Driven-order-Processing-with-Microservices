@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DLQ Inspector & Replay Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --danger: #f87171;
+            --success: #4ade80;
+            --warning: #fbbf24;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 2rem;
+            line-height: 1.5;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .title-badge {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        h1 { font-size: 1.75rem; font-weight: 700; }
+        .actions { display: flex; gap: 1rem; }
+        button {
+            background: var(--accent);
+            color: #0f172a;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button.secondary { background: var(--border); color: var(--text); }
+        button.danger { background: var(--danger); color: #fff; }
+        button.replay-btn { background: #10b981; color: #fff; padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            border-radius: 8px;
+        }
+        .stat-card .label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+        .stat-card .value { font-size: 1.8rem; font-weight: 700; margin-top: 0.25rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { background: #182234; font-weight: 600; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
+        tr:hover { background: rgba(255,255,255,0.02); }
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .badge.poisoned { background: rgba(248, 113, 113, 0.2); color: var(--danger); }
+        .badge.replayed { background: rgba(74, 222, 128, 0.2); color: var(--success); }
+        .badge.discarded { background: rgba(148, 163, 184, 0.2); color: var(--text-muted); }
+        pre.code-block {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: #090d16;
+            padding: 0.75rem;
+            border-radius: 6px;
+            max-height: 120px;
+            overflow-y: auto;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <div class="title-badge">Distributed Systems Reliability Engine</div>
+            <h1>Dead Letter Queue (DLQ) & Replay Admin</h1>
+        </div>
+        <div class="actions">
+            <button class="secondary" onclick="fetchMessages()">Refresh Messages</button>
+            <button onclick="replayAll()">Replay All Poisoned</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="label">Poisoned Messages</div>
+            <div class="value" id="count-poisoned" style="color: var(--danger);">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Replayed Messages</div>
+            <div class="value" id="count-replayed" style="color: var(--success);">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Total Captured</div>
+            <div class="value" id="count-total">0</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Original Topic</th>
+                <th>Message Key</th>
+                <th>Exception Details</th>
+                <th>Payload</th>
+                <th>Received At</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="messages-tbody">
+            <tr><td colspan="7" class="empty-state">Loading dead-lettered events...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchMessages() {
+            try {
+                const res = await fetch('/api/dlq/messages');
+                const data = await res.json();
+                renderTable(data);
+            } catch (e) {
+                console.error("Failed to load DLQ messages", e);
+            }
+        }
+
+        function renderTable(messages) {
+            const tbody = document.getElementById('messages-tbody');
+            if (!messages || messages.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No dead letter messages detected. System is running cleanly!</td></tr>';
+                updateStats(0, 0, 0);
+                return;
+            }
+
+            let poisoned = 0, replayed = 0;
+            tbody.innerHTML = messages.map(m => {
+                if (m.status === 'POISONED') poisoned++;
+                if (m.status === 'REPLAYED') replayed++;
+
+                return `
+                    <tr>
+                        <td><span class="badge ${m.status.toLowerCase()}">${m.status}</span></td>
+                        <td><strong>${escapeHtml(m.originalTopic)}</strong><br><small style="color:var(--text-muted)">${escapeHtml(m.dltTopic)}</small></td>
+                        <td><code>${escapeHtml(m.messageKey || 'N/A')}</code></td>
+                        <td><small style="color:var(--danger)">${escapeHtml(m.exceptionMessage || 'Poison Pill')}</small></td>
+                        <td><pre class="code-block">${escapeHtml(m.payload)}</pre></td>
+                        <td><small>${new Date(m.receivedAt).toLocaleTimeString()}</small></td>
+                        <td>
+                            ${m.status === 'POISONED' ? `<button class="replay-btn" onclick="replayMessage('${m.id}')">Replay</button>` : `<span style="color:var(--text-muted)">Done</span>`}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            updateStats(poisoned, replayed, messages.length);
+        }
+
+        function updateStats(poisoned, replayed, total) {
+            document.getElementById('count-poisoned').innerText = poisoned;
+            document.getElementById('count-replayed').innerText = replayed;
+            document.getElementById('count-total').innerText = total;
+        }
+
+        async function replayMessage(id) {
+            try {
+                await fetch(`/api/dlq/replay/${id}`, { method: 'POST' });
+                fetchMessages();
+            } catch (e) {
+                alert('Error replaying message: ' + e);
+            }
+        }
+
+        async function replayAll() {
+            try {
+                const res = await fetch('/api/dlq/replay-all', { method: 'POST' });
+                const json = await res.json();
+                alert(`Replayed ${json.replayedCount} messages!`);
+                fetchMessages();
+            } catch (e) {
+                alert('Error: ' + e);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        fetchMessages();
+        setInterval(fetchMessages, 3000); // Auto-refresh every 3s
+    </script>
+</body>
+</html>
