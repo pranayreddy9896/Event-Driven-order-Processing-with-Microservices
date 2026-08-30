@@ -184,11 +184,4 @@ kubectl apply -f k8s/04-microservices.yaml
 
 ---
 
-## 📝 Resume Bullet Points
 
-- *Architected an event-driven order processing pipeline across 4 microservices using Spring Boot 3, Apache Kafka, and PostgreSQL, achieving sub-25ms API response latency.*
-- *Eliminated dual-write discrepancies by implementing the Transactional Outbox pattern with an asynchronous relay scheduler, ensuring guaranteed at-least-once message delivery.*
-- *Designed choreographed Saga with compensating transactions to guarantee eventual consistency and automated inventory rollback across isolated database schemas upon payment declines.*
-- *Implemented idempotent consumers backed by persistent deduplication keys, successfully handling duplicate message storms with zero double-charging or stock mismatches.*
-- *Constructed an automated Dead Letter Queue (DLQ) topology with exponential backoff retries and an administrative replay dashboard for zero-data-loss incident mitigation.*
-- *Integrated OpenTelemetry and Jaeger distributed tracing across HTTP endpoints and Kafka record headers, enabling full end-to-end request visibility across service boundaries.*
